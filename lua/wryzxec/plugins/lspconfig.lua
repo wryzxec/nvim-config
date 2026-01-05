@@ -44,16 +44,34 @@ return {
             },
             clangd = {
                 cmd = (function()
-                    -- Prefer build dir if it exists, otherwise fall back to default clangd behavior
-                    local build_dirs = { "build", "cmake-build-debug", "cmake-build-release", "out/build" }
-                    local cwd = vim.loop.cwd()
+                    local build_dirs = { "build", "build/debug", "build/release", "cmake-build-debug", "cmake-build-release", "out/build" }
+
+                    -- Determine project root from the current buffer
+                    local root = vim.fs.root(0, { "compile_commands.json", "CMakeLists.txt", ".git" }) or vim.loop.cwd()
+
+                    -- Prefer a build dir that contains compile_commands.json
                     for _, d in ipairs(build_dirs) do
-                        local cc = cwd .. "/" .. d .. "/compile_commands.json"
+                        local cc = root .. "/" .. d .. "/compile_commands.json"
                         if vim.loop.fs_stat(cc) then
-                            return { "clangd", "--background-index", "--clang-tidy", "--compile-commands-dir=" .. d }
+                            return {
+                                "clangd",
+                                "--background-index",
+                                "--clang-tidy",
+                                "--header-insertion=iwyu",
+                                "--header-insertion-decorators",
+                                "--compile-commands-dir=" .. (root .. "/" .. d),
+                            }
                         end
                     end
-                    return { "clangd", "--background-index", "--clang-tidy" }
+
+                    -- Fallback: let clangd auto-discover (still better with root set correctly)
+                    return {
+                        "clangd",
+                        "--background-index",
+                        "--clang-tidy",
+                        "--header-insertion=iwyu",
+                        "--header-insertion-decorators",
+                    }
                 end)(),
             },
         }
